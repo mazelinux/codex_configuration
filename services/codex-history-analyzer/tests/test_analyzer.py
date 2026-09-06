@@ -90,6 +90,7 @@ class AnalyzerTest(unittest.TestCase):
             self.assertEqual(tokens["total"], 242)
             self.assertEqual(tokens["reasoning"], 8)
             self.assertEqual(tokens["context_peak"], 258400)
+            self.assertAlmostEqual(analyzer.workflow_card(session)[0]["observation"]["cache_read_share"], 160 / 220)
             progress = analyzer.context_progress(session)
             self.assertEqual(len(progress["samples"]), 2)
             self.assertAlmostEqual(progress["samples"][-1]["percent"], 200 / 258400 * 100)
