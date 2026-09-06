@@ -1,0 +1,4 @@
+interface:
+  display_name: "Workflow Analytics"
+  short_description: "Bootstrap and analyze session workflows"
+  default_prompt: "Use $workflow-analytics to bootstrap a read-only session-trace analytics service."

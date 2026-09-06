@@ -1,0 +1,8 @@
+[
+  {"pattern_type":"skill-reference","name":"skill mention","match":"\\bskill[s]?\\b|SKILL\\.md|技能","source_hint":"message","evidence_level":"referenced","notes":"Visible mention only."},
+  {"pattern_type":"kb-reference","name":"knowledge base mention","match":"\\b(KB|knowledge base|documentation)\\b|知识库|文档","source_hint":"message","evidence_level":"referenced","notes":"Visible mention only."},
+  {"pattern_type":"kb-read","name":"explicit knowledge-base read","match":"knowledge[-_ ]base|knowledge_base|/kb/|doc[_ -]?rag","source_hint":"tool","evidence_level":"opened","notes":"An explicit trace-visible KB read; ordinary documentation does not count."},
+  {"pattern_type":"search-call","name":"local search","match":"\\b(rg|grep|find|ag)\\b","source_hint":"tool","evidence_level":"observed","notes":"Local text or file search."},
+  {"pattern_type":"hypothesis","name":"candidate decision","match":"root cause|hypothesis|likely (?:cause|owner)|RCA candidate|recommended next step|validation plan|根因|根本原因|可能原因|建议下一步|验证计划","source_hint":"assistant","evidence_level":"stage-qualified","notes":"Candidate signal; not correctness."},
+  {"pattern_type":"workflow-stage","name":"validation","match":"\\b(test|pytest|validate|build|lint)\\b","source_hint":"tool","evidence_level":"stage-qualified","notes":"Explicit validation-like operation."}
+]
