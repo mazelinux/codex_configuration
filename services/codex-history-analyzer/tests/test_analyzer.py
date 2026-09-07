@@ -50,6 +50,17 @@ class AnalyzerTest(unittest.TestCase):
             self.assertEqual(len(analyzer.discover()), 1)
             self.assertEqual(len(analyzer.sessions()), 1)
 
+    def test_marks_archived_session_from_codex_archive_tree(self):
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as root:
+            home = Path(root)
+            write_trace(home / "sessions")
+            write_trace(home / "archived_sessions")
+            archived = home / "archived_sessions" / "demo.jsonl"
+            archived.write_text(archived.read_text().replace('"demo"', '"old"').replace('"/repo/a"', '"/repo/old"'))
+            states = {session["id"]: session["state"] for session in Analyzer(home).sessions()}
+            self.assertEqual(states, {"demo": "active", "old": "archived"})
+
     def test_extracts_chinese_typed_codex_message_without_lifecycle_completion(self):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as root:

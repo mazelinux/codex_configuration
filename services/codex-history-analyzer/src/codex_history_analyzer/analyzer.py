@@ -228,8 +228,9 @@ class Analyzer:
                     raise ValueError("Top-level trace must be a list or contain events/records")
                 first = records[0] if records else {}
                 sid = str(_nested(first if isinstance(first, dict) else {}, "session_id", "thread_id", "conversation_id", default=path.stem))
-                group = groups.setdefault(sid, {"id": sid, "fragments": [], "events": [], "cwd": "", "title": "", "metadata": {}})
+                group = groups.setdefault(sid, {"id": sid, "fragments": [], "events": [], "cwd": "", "title": "", "metadata": {}, "source_states": set()})
                 group["fragments"].append(str(path))
+                group["source_states"].add("archived" if (self.root / "archived_sessions") in path.parents else "active")
                 for record_index, raw in enumerate(records):
                     event = self._normalize(raw, path, record_index, sid)
                     group["events"].append(event)
@@ -253,6 +254,9 @@ class Analyzer:
             session["title"] = session["title"] or indexed.get("title") or self._conversation_title(events) or session["id"][:12]
             session["cwd"] = session["cwd"] or indexed.get("cwd", "")
             session["project"] = session["cwd"] or "Unknown project"
+            # A partial archival move may temporarily leave fragments in both
+            # trees; keep that trace visible in Active until it is fully moved.
+            session["state"] = "archived" if session["source_states"] == {"archived"} else "active"
             session["summary"] = self._session_summary(session)
             result.append(session)
         return sorted(result, key=lambda s: s["summary"]["end"] or "", reverse=True)
