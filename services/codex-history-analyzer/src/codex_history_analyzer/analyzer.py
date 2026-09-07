@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -254,9 +255,10 @@ class Analyzer:
             session["title"] = session["title"] or indexed.get("title") or self._conversation_title(events) or session["id"][:12]
             session["cwd"] = session["cwd"] or indexed.get("cwd", "")
             session["project"] = session["cwd"] or "Unknown project"
-            # A partial archival move may temporarily leave fragments in both
-            # trees; keep that trace visible in Active until it is fully moved.
-            session["state"] = "archived" if session["source_states"] == {"archived"} else "active"
+            # Prefer the Desktop sidebar's own archival state.  The source-tree
+            # fallback covers imported traces and a partial archival move.
+            source_state = "archived" if session["source_states"] == {"archived"} else "active"
+            session["state"] = indexed.get("state", source_state)
             session["summary"] = self._session_summary(session)
             result.append(session)
         return sorted(result, key=lambda s: s["summary"]["end"] or "", reverse=True)
@@ -270,22 +272,55 @@ class Analyzer:
         return first[:56] + ("…" if len(first) > 56 else "")
 
     def _session_index(self) -> dict[str, dict[str, str]]:
-        """Best-effort title/project enrichment; index entries are not trace events."""
+        """Read title/state metadata without treating it as session evidence."""
         found: dict[str, dict[str, str]] = {}
-        for path in self.root.rglob("*.json"):
-            if path.name.lower().replace("-", "_") not in {"session_index.json", "sessions_index.json"}:
-                continue
+        index_paths = set()
+        for filename in ("session_index.json", "sessions_index.json", "session_index.jsonl", "sessions_index.jsonl"):
+            index_paths.update(self.root.rglob(filename))
+        for path in sorted(index_paths):
             try:
-                value = json.loads(path.read_text(encoding="utf-8"))
-                rows = value.values() if isinstance(value, dict) else value
+                if path.suffix.lower() == ".jsonl":
+                    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+                else:
+                    value = json.loads(path.read_text(encoding="utf-8"))
+                    rows = value.values() if isinstance(value, dict) else value
                 for row in rows:
                     if not isinstance(row, dict):
                         continue
                     sid = str(_nested(row, "session_id", "thread_id", "id", default=""))
                     if sid:
-                        found[sid] = {"title": str(_nested(row, "title", "chat_title", default="")), "cwd": str(_nested(row, "cwd", "project_path", default=""))}
+                        entry = found.setdefault(sid, {})
+                        title = str(_nested(row, "thread_name", "title", "chat_title", default=""))
+                        cwd = str(_nested(row, "cwd", "project_path", default=""))
+                        if title:
+                            entry["title"] = title
+                        if cwd:
+                            entry["cwd"] = cwd
             except (OSError, json.JSONDecodeError):
                 continue
+        roots = [self.root]
+        if self.root.name in {"sessions", "archived_sessions"}:
+            roots.append(self.root.parent)
+        state_databases = []
+        for root in roots:
+            state_databases.extend(root.glob("state_*.sqlite"))
+        for path in sorted(set(state_databases), key=lambda item: item.stat().st_mtime):
+            try:
+                with sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True) as database:
+                    rows = database.execute("SELECT id, title, cwd, archived FROM threads").fetchall()
+            except (OSError, sqlite3.Error):
+                continue
+            for session_id, title, cwd, archived in rows:
+                if not session_id:
+                    continue
+                entry = found.setdefault(str(session_id), {})
+                # session_index.jsonl is the canonical Desktop title source;
+                # the state database may still retain the initial prompt.
+                if title and not entry.get("title"):
+                    entry["title"] = str(title)
+                if cwd:
+                    entry["cwd"] = str(cwd)
+                entry["state"] = "archived" if archived else "active"
         return found
 
     @staticmethod

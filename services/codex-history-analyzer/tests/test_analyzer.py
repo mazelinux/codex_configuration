@@ -61,6 +61,26 @@ class AnalyzerTest(unittest.TestCase):
             states = {session["id"]: session["state"] for session in Analyzer(home).sessions()}
             self.assertEqual(states, {"demo": "active", "old": "archived"})
 
+    def test_prefers_codex_desktop_thread_title_and_archive_state(self):
+        import sqlite3
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as root:
+            home = Path(root)
+            write_trace(home / "sessions")
+            (home / "session_index.jsonl").write_text(
+                '{"id":"demo","thread_name":"Canonical Codex title"}\n', encoding="utf-8"
+            )
+            with sqlite3.connect(home / "state_1.sqlite") as database:
+                database.execute("CREATE TABLE threads (id TEXT, title TEXT, cwd TEXT, archived INTEGER)")
+                database.execute(
+                    "INSERT INTO threads VALUES (?, ?, ?, ?)",
+                    ("demo", "Initial prompt title", "/desktop/project", 1),
+                )
+            session = Analyzer(home).sessions()[0]
+            self.assertEqual(session["title"], "Canonical Codex title")
+            self.assertEqual(session["project"], "/repo/a")  # trace CWD remains authoritative
+            self.assertEqual(session["state"], "archived")
+
     def test_project_lists_sort_each_state_newest_first(self):
         from codex_history_analyzer.cli import defaultdict_list
         sessions = [
