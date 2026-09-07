@@ -61,6 +61,18 @@ class AnalyzerTest(unittest.TestCase):
             states = {session["id"]: session["state"] for session in Analyzer(home).sessions()}
             self.assertEqual(states, {"demo": "active", "old": "archived"})
 
+    def test_project_lists_sort_each_state_newest_first(self):
+        from codex_history_analyzer.cli import defaultdict_list
+        sessions = [
+            {"id": "old-active", "title": "Old active", "project": "/repo", "state": "active", "summary": {"end": "2026-09-01T10:00:00Z"}},
+            {"id": "new-archived", "title": "New archived", "project": "/repo", "state": "archived", "summary": {"end": "2026-09-04T10:00:00Z"}},
+            {"id": "new-active", "title": "New active", "project": "/repo", "state": "active", "summary": {"end": "2026-09-05T10:00:00Z"}},
+            {"id": "old-archived", "title": "Old archived", "project": "/repo", "state": "archived", "summary": {"end": "2026-09-02T10:00:00Z"}},
+        ]
+        grouped = defaultdict_list(sessions)[0]
+        self.assertEqual([row["id"] for row in grouped["active"]], ["new-active", "old-active"])
+        self.assertEqual([row["id"] for row in grouped["archived"]], ["new-archived", "old-archived"])
+
     def test_extracts_chinese_typed_codex_message_without_lifecycle_completion(self):
         from tempfile import TemporaryDirectory
         with TemporaryDirectory() as root:

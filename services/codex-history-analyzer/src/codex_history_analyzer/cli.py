@@ -167,9 +167,17 @@ def defaultdict_list(sessions):
     groups = {}
     for session in sessions:
         group = groups.setdefault(session["project"], {"active": [], "archived": []})
-        group[session.get("state", "active")].append({"id": session["id"], "title": session["title"]})
+        group[session.get("state", "active")].append({
+            "id": session["id"],
+            "title": session["title"],
+            "end": session["summary"].get("end") or "",
+        })
     return [
-        {"project": project, "active": rows["active"], "archived": rows["archived"]}
+        {
+            "project": project,
+            "active": [{key: item[key] for key in ("id", "title")} for item in sorted(rows["active"], key=lambda item: item["end"], reverse=True)],
+            "archived": [{key: item[key] for key in ("id", "title")} for item in sorted(rows["archived"], key=lambda item: item["end"], reverse=True)],
+        }
         for project, rows in sorted(groups.items())
     ]
 
